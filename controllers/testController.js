@@ -1,6 +1,9 @@
-// Controlador de prueba
 const getHello = (req, res) => {
-  res.json({ message: "Hola desde el controlador 🎉" });
+  res.json({
+    status: 'OK',
+    message: 'Backend funcionando',
+    timestamp: new Date().toISOString()
+  });
 };
 
 const postEcho = (req, res) => {

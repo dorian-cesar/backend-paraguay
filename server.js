@@ -18,6 +18,7 @@ const routeSeat = require("./routes/seatRoutes");
 const routeService = require("./routes/serviceRoutes");
 const routeUsers = require("./routes/userRoutes");
 const routeBus = require("./routes/busRoutes");
+const routeCity = require("./routes/cityRoutes");
 
 // Middlewares
 app.use(cors());
@@ -37,18 +38,24 @@ app.use("/api/seats", authRole(), dateRule, routeSeat);
 app.use("/api/services", authRole(), dateRule, routeService);
 app.use("/api/buses", authRole(), dateRule, routeBus);
 app.use("/api/users", authRole('superAdmin'), routeUsers);
+app.use("/api/cities", authRole(), routeCity);
 
-
-// Configuración desde .env
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 const MONGO_URI = process.env.MONGO_URI;
 
-// Conexión a MongoDB (sin las opciones obsoletas)
 mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log("✅ Conectado a MongoDB");
+    console.log("Conectado a DB");
     startReleaseSeatsCron();
-    // startGenerateServicesCron();
-    app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}`));
+
+    if (process.env.NODE_ENV === 'production') {
+      startGenerateServicesCron();
+    }
+
+    app.listen(PORT, () => {
+      process.env.NODE_ENV === 'production'
+        ? console.log(`Servidor en puerto: ${PORT}`)
+        : console.log(`Servidor en desarrollo en http://localhost:${PORT}`)
+    });
   })
-  .catch(err => console.error("❌ Error en conexión MongoDB:", err));
+  .catch(err => console.error("Error en conexión a DB:", err));
