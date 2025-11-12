@@ -4,8 +4,16 @@ const User = require("../models/User");
 
 const { validDate } = require("../utils/fechaChile");
 
-// --- Utilidades ---
+const sanitize = (doc) => {
+    if (!doc) return null;
+    const obj = doc.toObject ? doc.toObject() : doc;
+    delete obj.password;
+    return obj;
+};
+
+const ALLOWED_ROLES = new Set(["usuario"]);
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
+const isBcryptHash = (s = "") => typeof s === "string" && /^\$2[aby]\$/.test(s);
 
 // --- Login ---
 exports.loginEmail = async (req, res) => {
@@ -174,3 +182,37 @@ exports.loginRut = async (req, res) => {
     }
 };
 
+exports.createUser = async (req, res) => {
+    try {
+        let { name, rut, email, password, role = "usuario", activo = true } = req.body || {};
+
+        email = typeof email === "string" ? email.trim().toLowerCase() : email;
+        rut = typeof rut === "string" ? rut.trim() : rut;
+
+        if (!name || !email || !password || !role || !rut) {
+            return res.status(400).json({ message: "Faltan campos requeridos (name, rut, email, password, role)." });
+        }
+        if (!isValidEmail(email)) return res.status(400).json({ message: "Email inválido." });
+        if (isBcryptHash(password)) return res.status(400).json({ message: "Contraseña hasheada." });
+        if (!ALLOWED_ROLES.has(role)) return res.status(400).json({ message: "Rol inválido." });
+        if (password.length < 8) return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres." });
+
+        const user = new User({ name, rut, email, password, role, activo });
+        await user.save();
+
+        return res.status(201).json({
+            success: true,
+            message: "Usuario creado exitosamente."
+        });
+
+    } catch (err) {
+        if (err?.code === 11000) {
+            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || "campo único";
+            return res.status(409).json({ message: `Ya existe un usuario con ese ${field}.` });
+        }
+        if (err?.name === "ValidationError") {
+            return res.status(422).json({ message: "Error de validación.", details: err.errors });
+        }
+        return res.status(500).json({ message: "Error al crear usuario.", error: err.message });
+    }
+};

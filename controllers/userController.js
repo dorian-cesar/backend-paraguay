@@ -9,7 +9,7 @@ const sanitize = (doc) => {
     return obj;
 };
 
-const ALLOWED_ROLES = new Set(["superAdmin", "centinela", "contratista", "conductor", "auxiliar"]);
+const ALLOWED_ROLES = new Set(["superAdmin", "usuario", "admin", "conductor", "auxiliar"]);
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
 const isBcryptHash = (s = "") => typeof s === "string" && /^\$2[aby]\$/.test(s);
 

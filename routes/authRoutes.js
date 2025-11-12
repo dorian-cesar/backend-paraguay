@@ -1,11 +1,12 @@
 const { Router } = require("express");
 const ctrl = require("../controllers/authController");
 const rateLimit = require("express-rate-limit");
+const authRegister = require("../middlewares/authRegister");
 const router = Router();
 
 const loginLimiter = rateLimit({
-    windowMs: 10 * 60 * 1000, // 10 minutos
-    max: 6,                   // max 6 intentos
+    windowMs: 5 * 60 * 1000, // 5 minutos
+    max: 10,                   // max 10 intentos
     message: { message: "Demasiados intentos fallidos. Intenta más tarde." },
     standardHeaders: true,
     legacyHeaders: false,
@@ -13,5 +14,6 @@ const loginLimiter = rateLimit({
 
 router.post("/email", loginLimiter, ctrl.loginEmail);
 router.post("/rut", loginLimiter, ctrl.loginRut);
+router.post("/register", authRegister(), loginLimiter, ctrl.createUser);
 
 module.exports = router;
