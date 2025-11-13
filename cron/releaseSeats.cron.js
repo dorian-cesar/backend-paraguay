@@ -2,24 +2,36 @@ const cron = require('node-cron');
 const Seat = require('../models/Seat');
 
 function startReleaseSeatsCron() {
-    //1 minuto
+    // Ejecutar cada minuto
     cron.schedule('* * * * *', async () => {
         try {
             const now = new Date();
-            const expiredSeats = await Seat.updateMany(
-                { isAvailable: false, holdUntil: { $lte: now } },
-                { $set: { isAvailable: true, holdUntil: null, passenger: null } }
+
+            const result = await Seat.updateMany(
+                {
+                    status: 'reserved',
+                    holdUntil: { $lte: now }
+                },
+                {
+                    $set: {
+                        isAvailable: true,
+                        status: 'available',
+                        holdUntil: null
+                    },
+                    $unset: { passenger: "" }
+                }
             );
 
-            if (expiredSeats.modifiedCount > 0) {
-                console.log(`[CRON-SEATS] Se liberaron ${expiredSeats.modifiedCount} asientos expirados`);
+            if (result.modifiedCount > 0) {
+                console.log(`[CRON-SEATS] Liberados ${result.modifiedCount} asientos con reserva expirada`);
             }
+
         } catch (err) {
-            console.error('[CRON-SEATS] Error liberando asientos:', err);
+            console.error('[CRON-SEATS] Error liberando asientos expirados:', err);
         }
     });
 
-    console.log('[CRON-SEATS] Cron iniciado');
+    console.log('[CRON-SEATS] Cron de limpieza de asientos iniciado');
 }
 
 module.exports = startReleaseSeatsCron;

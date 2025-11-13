@@ -1,13 +1,15 @@
+// controllers/seat.controller.js
 const Seat = require('../models/Seat');
 const User = require('../models/User');
 const Service = require('../models/Service');
+const City = require('../models/City');
 
-
+// RESERVAR asiento (hold temporal)
 async function reserveSeat(req, res) {
   try {
-    const { serviceId, seatCode, rut, origin, destination } = req.body;
+    const { serviceId, seatCode, rut, originCityId, destinationCityId } = req.body;
 
-    if (!serviceId || !seatCode || !rut || !origin || !destination) {
+    if (!serviceId || !seatCode || !rut || !originCityId || !destinationCityId) {
       return res.status(400).json({ message: 'Faltan datos obligatorios' });
     }
 
@@ -15,70 +17,123 @@ async function reserveSeat(req, res) {
     const user = await User.findOne({ rut });
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
+    // Validar servicio y ciudades
     const service = await Service.findById(serviceId);
-    if (!service) return res.status(404).json({ message: 'Servicio no encontrado.' });
+    if (!service) return res.status(404).json({ message: 'Servicio no encontrado' });
 
-    let originStopName;
-    let destStopName;
-
-    if (service.direction === 'subida') {
-      originStopName = origin
-      destStopName = service.destination;
-    } else {
-      originStopName = service.origin;
-      destStopName = destination;
+    const originCity = await City.findById(originCityId);
+    const destinationCity = await City.findById(destinationCityId);
+    if (!originCity || !destinationCity) {
+      return res.status(404).json({ message: 'Ciudad de origen o destino no encontrada' });
     }
 
-    // Reserva atómica
-    const now = new Date();
-    const holdUntil = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutos
-    const seat = await Seat.findOneAndUpdate(
-      { service: serviceId, code: seatCode, isAvailable: true, $or: [{ holdUntil: null }, { holdUntil: { $lte: now } }] },
-      {
-        isAvailable: false,
-        holdUntil,
-        passenger:
-        {
-          user: user._id,
-          origin: originStopName,
-          destination: destStopName
-        }
-      },
-      { new: true }
-    ).populate('passenger.user', 'name rut');
 
-    if (!seat) return res.status(400).json({ message: 'Asiento no disponible' });
+    // Validar que las paradas existen en el servicio
+    const originStop = service.departures.find(d => d.stop === originCity.name);
+    const destinationStop = service.departures.find(d => d.stop === destinationCity.name);
+
+
+    if (!originStop || !destinationStop) {
+      return res.status(400).json({ message: 'Las ciudades seleccionadas no existen en este servicio' });
+    }
+
+    if (originStop.order >= destinationStop.order) {
+      return res.status(400).json({ message: 'La ciudad de destino debe estar después de la ciudad de origen' });
+    }
+
+    // 🔍 DEPURACIÓN: Ver todos los asientos del servicio
+    const allSeats = await Seat.find({ service: serviceId });
+
+    // Buscar asiento específico
+    const now = new Date();
+
+    const seat = await Seat.findOne({
+      service: serviceId,
+      code: seatCode
+    });
+
+    if (!seat) {
+      return res.status(404).json({ message: 'Asiento no encontrado' });
+    }
+
+    // Verificar disponibilidad
+    const isAvailable = (
+      seat.status === 'available' ||
+      (seat.status === 'reserved' && seat.holdUntil && seat.holdUntil < now)
+    );
+
+
+    if (!isAvailable) {
+      return res.status(400).json({
+        message: 'Asiento no disponible para reserva',
+        details: {
+          status: seat.status,
+          isAvailable: seat.isAvailable,
+          holdUntil: seat.holdUntil,
+          isHoldExpired: seat.holdUntil && seat.holdUntil < now
+        }
+      });
+    }
+
+    // Realizar reserva temporal (10 minutos)
+    await seat.temporaryReserve(user._id, originCityId, destinationCityId, 10);
+
+    const populatedSeat = await Seat.findById(seat._id)
+      .populate('passenger.user', 'name rut email')
+      .populate('passenger.origin', 'name code')
+      .populate('passenger.destination', 'name code');
 
     res.status(201).json({
-      message: `Asiento ${seat.code} reservado temporalmente desde ${originStopName} hasta ${destStopName}`,
-      seat
+      message: `Asiento ${seat.code} reservado temporalmente desde ${originCity.name} hasta ${destinationCity.name}`,
+      seat: populatedSeat,
+      holdUntil: seat.holdUntil
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al reservar asiento' });
+    console.error('[ERROR] Error en reserveSeat:', err);
+    res.status(500).json({ message: 'Error al reservar asiento', error: err.message });
   }
 }
-
 
 // CONFIRMAR asiento (ocupado hasta destino)
 async function confirmSeat(req, res) {
   try {
     const { serviceId, seatCode } = req.body;
-    if (!serviceId || !seatCode) return res.status(400).json({ message: 'Faltan datos obligatorios' });
 
-    const seat = await Seat.findOne({ service: serviceId, code: seatCode });
-    if (!seat) return res.status(404).json({ message: 'Asiento no encontrado' });
+    if (!serviceId || !seatCode) {
+      return res.status(400).json({ message: 'Faltan datos obligatorios' });
+    }
 
-    // Confirmar asiento
-    seat.holdUntil = null;  // eliminar expiración de hold
-    seat.isAvailable = false; // asegurar que sigue ocupado
+    const seat = await Seat.findOne({
+      service: serviceId,
+      code: seatCode,
+      status: 'reserved' // Solo se pueden confirmar asientos en estado reserved
+    })
+      .populate('passenger.user', 'name rut email')
+      .populate('passenger.origin', 'name code')
+      .populate('passenger.destination', 'name code');
 
-    await seat.save();
-    res.json({ message: `Asiento ${seat.code} confirmado`, seat });
+    if (!seat) {
+      return res.status(404).json({ message: 'Asiento no encontrado o no está en estado de reserva' });
+    }
+
+    // Verificar que la reserva no haya expirado
+    if (seat.holdUntil && seat.holdUntil < new Date()) {
+      await seat.releaseSeat();
+      return res.status(400).json({ message: 'La reserva ha expirado' });
+    }
+
+    // Confirmar reserva
+    await seat.confirmReservation();
+
+    res.json({
+      message: `Asiento ${seat.code} confirmado exitosamente`,
+      seat
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al confirmar asiento' });
+    console.error('Error en confirmSeat:', err);
+    res.status(500).json({ message: 'Error al confirmar asiento', error: err.message });
   }
 }
 
@@ -86,22 +141,66 @@ async function confirmSeat(req, res) {
 async function releaseSeat(req, res) {
   try {
     const { serviceId, seatCode } = req.body;
-    if (!serviceId || !seatCode) return res.status(400).json({ message: 'Faltan datos obligatorios' });
 
-    const seat = await Seat.findOne({ service: serviceId, code: seatCode });
-    if (!seat) return res.status(404).json({ message: 'Asiento no encontrado' });
+    if (!serviceId || !seatCode) {
+      return res.status(400).json({ message: 'Faltan datos obligatorios' });
+    }
 
-    seat.isAvailable = true;
-    seat.holdUntil = null;
-    seat.passenger = null;
+    const seat = await Seat.findOne({
+      service: serviceId,
+      code: seatCode,
+      status: { $in: ['reserved', 'confirmed'] } // Solo se pueden liberar asientos reservados o confirmados
+    });
 
-    await seat.save();
-    res.json({ message: `Asiento ${seat.code} liberado`, seat });
+    if (!seat) {
+      return res.status(404).json({ message: 'Asiento no encontrado o no está reservado' });
+    }
+
+    await seat.releaseSeat();
+
+    res.json({
+      message: `Asiento ${seat.code} liberado exitosamente`,
+      seat: {
+        _id: seat._id,
+        code: seat.code,
+        service: seat.service,
+        status: seat.status,
+        isAvailable: seat.isAvailable
+      }
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al liberar asiento' });
+    console.error('Error en releaseSeat:', err);
+    res.status(500).json({ message: 'Error al liberar asiento', error: err.message });
   }
 }
 
-module.exports = { reserveSeat, confirmSeat, releaseSeat };
+// OBTENER asientos de un servicio
+async function getServiceSeats(req, res) {
+  try {
+    const { serviceId } = req.params;
 
+    const seats = await Seat.find({ service: serviceId })
+      .populate('passenger.user', 'name rut email')
+      .populate('passenger.origin', 'name code')
+      .populate('passenger.destination', 'name code')
+      .select('-__v -createdAt -updatedAt');
+
+    res.json({
+      serviceId,
+      count: seats.length,
+      seats
+    });
+
+  } catch (err) {
+    console.error('Error en getServiceSeats:', err);
+    res.status(500).json({ message: 'Error al obtener asientos', error: err.message });
+  }
+}
+
+module.exports = {
+  reserveSeat,
+  confirmSeat,
+  releaseSeat,
+  getServiceSeats
+};

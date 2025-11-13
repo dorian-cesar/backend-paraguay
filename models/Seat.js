@@ -1,4 +1,4 @@
-// models/Seat.js (modificado)
+// models/Seat.js
 const mongoose = require('mongoose');
 
 const seatSchema = new mongoose.Schema({
@@ -8,32 +8,64 @@ const seatSchema = new mongoose.Schema({
   type: String,
   isAvailable: { type: Boolean, default: true },
   holdUntil: { type: Date, default: null },
+  status: {
+    type: String,
+    enum: ['available', 'reserved', 'confirmed'],
+    default: 'available'
+  },
   passenger: {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     origin: { type: mongoose.Schema.Types.ObjectId, ref: 'City' },
     destination: { type: mongoose.Schema.Types.ObjectId, ref: 'City' },
     boardingStop: String,
     landingStop: String,
-    boarded: { type: Boolean, default: false }, // Si el pasajero subió
-    landed: { type: Boolean, default: false } // Si el pasajero bajó
+    boarded: { type: Boolean, default: false },
+    landed: { type: Boolean, default: false }
   }
 }, { timestamps: true });
 
+// Método para reserva temporal
+seatSchema.methods.temporaryReserve = async function (userId, originId, destinationId, holdMinutes = 10) {
+  this.isAvailable = false;
+  this.status = 'reserved';
+  this.holdUntil = new Date(Date.now() + holdMinutes * 60 * 1000);
+  this.passenger = {
+    user: userId,
+    origin: originId,
+    destination: destinationId,
+    boarded: false,
+    landed: false
+  };
+  return await this.save(); // Asegurar que es async/await
+};
+
+// Método para confirmar reserva
+seatSchema.methods.confirmReservation = function () {
+  this.status = 'confirmed';
+  this.holdUntil = null; // Eliminar expiración
+  return this.save();
+};
+
+// Método para liberar asiento
 seatSchema.methods.releaseSeat = function () {
   this.isAvailable = true;
+  this.status = 'available';
   this.holdUntil = null;
   this.passenger = undefined;
   return this.save();
 };
 
+// Método para marcar como abordado
 seatSchema.methods.markAsBoarded = function () {
   this.passenger.boarded = true;
   return this.save();
 };
 
+// Método para marcar como llegado a destino
 seatSchema.methods.markAsLanded = function () {
   this.passenger.landed = true;
   this.isAvailable = true;
+  this.status = 'available';
   this.passenger = {
     user: this.passenger.user,
     origin: this.passenger.origin,
@@ -45,5 +77,9 @@ seatSchema.methods.markAsLanded = function () {
   };
   return this.save();
 };
+
+// Índice para búsquedas eficientes
+seatSchema.index({ service: 1, code: 1 });
+seatSchema.index({ holdUntil: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Seat', seatSchema);

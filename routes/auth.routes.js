@@ -15,6 +15,6 @@ const limiter = rateLimit({
 
 router.post("/email", limiter, ctrl.loginEmail);
 router.post("/rut", limiter, ctrl.loginRut);
-router.post("/register", auth({ secret: process.env.SECRET }), limiter, ctrl.createUser);
+router.post("/register", authMiddleware({ secret: process.env.SECRET }), limiter, ctrl.createUser);
 
 module.exports = router;

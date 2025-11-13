@@ -35,7 +35,7 @@ function startGenerateServicesCron() {
     }, {
         timezone: "America/Santiago"
     });
-    console.log("[CRON-SERVICES] Cron iniciado");
+    console.log("[CRON-SERVICES] Cron de creación de servicios iniciado");
 }
 
 module.exports = startGenerateServicesCron;
