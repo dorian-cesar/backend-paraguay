@@ -32,13 +32,13 @@ app.use("/api/auth", routeAuth);
 app.use("/api/test", testRoutes);
 
 // con autenticacion
-app.use("/api/bus-layout", authRole('superAdmin'), routeBusLayout);
-app.use("/api/route-masters", authRole('superAdmin'), routeMastersRoutes);
-app.use("/api/seats", authRole(), dateRule, routeSeat);
-app.use("/api/services", authRole(), dateRule, routeService);
-app.use("/api/buses", authRole(), dateRule, routeBus);
-app.use("/api/users", authRole('superAdmin'), routeUsers);
-app.use("/api/cities", authRole(), routeCity);
+app.use("/api/bus-layout", authRole('superAdmin', 'admin'), routeBusLayout);
+app.use("/api/route-masters", authRole('superAdmin', 'admin'), routeMastersRoutes);
+app.use("/api/seats", authRole(), routeSeat);
+app.use("/api/services", authRole(), routeService);
+app.use("/api/buses", authRole(), routeBus);
+app.use("/api/users", authRole('superAdmin', 'admin'), routeUsers);
+app.use("/api/cities", authRole('superAdmin', 'admin'), routeCity);
 
 const PORT = process.env.PORT;
 const MONGO_URI = process.env.MONGO_URI;
