@@ -1,4 +1,3 @@
-// middlewares/authRole.js
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (token) => {

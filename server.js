@@ -1,44 +1,34 @@
 require("dotenv").config();
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-const testRoutes = require("./routes/tert.routes");
+//crons
 const startReleaseSeatsCron = require("./cron/releaseSeats");
 const startGenerateServicesCron = require("./cron/generateServices");
 
+//server
+const routes = require("./routes/index.routes")
 const app = express();
 
-// Rutas servicios
-const routeAuth = require("./routes/auth.routes");
-const routeBusLayout = require("./routes/busLayout.routes");
-const routeMastersRoutes = require("./routes/routeMaster.routes");
-const routeSeat = require("./routes/seat.routes");
-const routeService = require("./routes/service.routes");
-const routeUsers = require("./routes/user.routes");
-const routeBus = require("./routes/bus.routes");
-const routeCity = require("./routes/city.routes");
-
-// Middlewares
+//middlewares
 app.use(cors());
 app.use(express.json());
-const authRole = require("./middlewares/authRole");
-const dateRule = require("./middlewares/dateRule");
 
+//rutas
+app.use('/api', routes);
 
-//sin autenticacion
-app.use("/api/auth", routeAuth);
-app.use("/api/test", testRoutes);
+app.get('/api/test', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Backend funcionando',
+    timestamp: new Date().toISOString()
+  });
+});
 
-// con autenticacion
-app.use("/api/bus-layout", authRole('superAdmin', 'admin'), routeBusLayout);
-app.use("/api/route-masters", authRole('superAdmin', 'admin'), routeMastersRoutes);
-app.use("/api/seats", authRole(), routeSeat);
-app.use("/api/services", authRole(), routeService);
-app.use("/api/buses", authRole(), routeBus);
-app.use("/api/users", authRole('superAdmin', 'admin'), routeUsers);
-app.use("/api/cities", authRole('superAdmin', 'admin'), routeCity);
+app.use((req, res) => {
+  res.status(404).json({ error: 'Ruta no encontrada' });
+});
 
 const PORT = process.env.PORT;
 const MONGO_URI = process.env.MONGO_URI;
