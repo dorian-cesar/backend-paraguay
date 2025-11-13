@@ -10,7 +10,8 @@
 
 ---
 ## pasos
-1. generar servicios manualmente
+1. modificar ruta master y sus dependientes para no usar direction
+1.1 generar servicios manualmente
 2. generar servicios automaticamente
 3. manejar roles
 4. ver logica de reserva y confirmación
