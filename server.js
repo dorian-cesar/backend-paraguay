@@ -13,8 +13,8 @@ const app = express();
 // Rutas servicios
 const routeAuth = require("./routes/auth.routes");
 const routeBusLayout = require("./routes/busLayout.routes");
-const routeMastersRoutes = require("./routes/routeMasters");
-const routeSeat = require("./routes/seatRoutes");
+const routeMastersRoutes = require("./routes/routeMaster.routes");
+const routeSeat = require("./routes/seat.routes");
 const routeService = require("./routes/serviceRoutes");
 const routeUsers = require("./routes/userRoutes");
 const routeBus = require("./routes/bus.routes");
