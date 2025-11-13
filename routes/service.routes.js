@@ -1,23 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/service.controller');
-const authMiddleware = require("../middlewares/auth.middleware");
+const auth = require("../middlewares/auth.middleware");
 
 
-router.post('/generate', authMiddleware({ allowedRoles: ['superAdmin'] }), ctrl.generateServices);
-router.post('/generate-all', authMiddleware({ allowedRoles: ['superAdmin'] }), ctrl.generateServicesForAllActiveRoutes);
+router.post('/generate', auth({ allowedRoles: ['superAdmin'] }), ctrl.generateServices);
+router.post('/generate-all', auth({ allowedRoles: ['superAdmin'] }), ctrl.generateServicesForAllActiveRoutes);
 
 // Listar servicios
-router.get('/', ctrl.getServices);
-router.get('/filter', ctrl.getServicesByFilter);
-router.get('/:id', ctrl.getServicesByID);
+router.get('/', auth(), ctrl.getServices);
+router.get('/filter', auth(), ctrl.getServicesByFilter);
+router.get('/:id', auth(), ctrl.getServicesByID);
 
 // tripulacion
-router.put('/:id/assign', authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.assignBusAndCrew);
+router.put('/:id/assign', auth({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.assignBusAndCrew);
 
 // far
-router.put('/:id/far', authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.assignFar);
-router.put('/:id/far/expenses', authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.addFarExpenses);
+router.put('/:id/far', auth({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.assignFar);
+router.put('/:id/far/expenses', auth({ allowedRoles: ['superAdmin', 'admin'] }), ctrl.addFarExpenses);
 
 
 module.exports = router;
