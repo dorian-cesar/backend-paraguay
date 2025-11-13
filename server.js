@@ -17,7 +17,7 @@ const routeMastersRoutes = require("./routes/routeMasters");
 const routeSeat = require("./routes/seatRoutes");
 const routeService = require("./routes/serviceRoutes");
 const routeUsers = require("./routes/userRoutes");
-const routeBus = require("./routes/busRoutes");
+const routeBus = require("./routes/bus.routes");
 const routeCity = require("./routes/cityRoutes");
 
 // Middlewares
