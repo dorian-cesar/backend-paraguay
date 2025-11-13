@@ -2,14 +2,16 @@
 ---
 ## funcionamiento
 1. Crear user.
-2. Crear Cities y Layouts.
-3. Crear Bus.
-4. Crear RouteMaster.
-5. Crear Servicios (manual y automático).
-6. Asignar Tripulación.
+2. Crear Cities.
+3. Crear Layout
+4. Crear Bus.
+5. Crear RouteMaster.
+6. Crear Servicios (manual y automático).
+7. Asignar Tripulación.
 
 ---
 ## pendiente
  - generar servicios automaticamente
  - agregar paginacion a los get y optimizar respuestas - 
  - reorganizar archivos y borrar los inutilizados  - 
+ - tratar de crear un layout de 1 piso
