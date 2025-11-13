@@ -4,8 +4,8 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 
 //crons
-const startReleaseSeatsCron = require("./cron/releaseSeats");
-const startGenerateServicesCron = require("./cron/generateServices");
+const startReleaseSeatsCron = require("./cron/releaseSeats.cron");
+const startGenerateServicesCron = require("./cron/generateServices.cron");
 
 //server
 const routes = require("./routes/index.routes")

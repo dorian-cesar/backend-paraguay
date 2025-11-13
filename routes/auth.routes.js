@@ -1,8 +1,9 @@
 const { Router } = require("express");
 const ctrl = require("../controllers/auth.controller");
 const rateLimit = require("express-rate-limit");
-const authRegister = require("../middlewares/authRegister");
 const router = Router();
+
+const authMiddleware = require("../middlewares/auth.middleware");
 
 const limiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutos
@@ -14,6 +15,6 @@ const limiter = rateLimit({
 
 router.post("/email", limiter, ctrl.loginEmail);
 router.post("/rut", limiter, ctrl.loginRut);
-router.post("/register", authRegister(), limiter, ctrl.createUser);
+router.post("/register", auth({ secret: process.env.SECRET }), limiter, ctrl.createUser);
 
 module.exports = router;

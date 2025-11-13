@@ -12,18 +12,15 @@ const bus = require("./bus.routes");
 const city = require("./city.routes");
 
 //middleware
-const authRole = require("../middlewares/authRole");
+const authMiddleware = require("../middlewares/auth.middleware");
 
-//no auth
-router.use("/auth", auth);
-
-//auth
-router.use("/bus-layout", authRole('superAdmin', 'admin'), busLayout);
-router.use("/route-masters", authRole('superAdmin', 'admin'), routeMaster);
-router.use("/seats", authRole(), seat);
-router.use("/services", authRole(), service);
-router.use("/buses", authRole(), bus);
-router.use("/users", authRole('superAdmin', 'admin'), user);
-router.use("/cities", authRole('superAdmin', 'admin'), city);
+router.use("/auth", auth); //middleware dentro de su propia ruta
+router.use("/bus-layout", authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), busLayout);
+router.use("/route-masters", authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), routeMaster);
+router.use("/seats", seat); //middleware dentro de su propia ruta
+router.use("/services", service); //middleware dentro de su propia ruta
+router.use("/buses", authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), bus);
+router.use("/users", authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), user);
+router.use("/cities", authMiddleware({ allowedRoles: ['superAdmin', 'admin'] }), city);
 
 module.exports = router;

@@ -13,7 +13,7 @@
  - -- modificar ruta master y sus dependientes para no usar direction
  - -- generar servicios manualmente
  - generar servicios automaticamente
- - manejar roles
+ - manejar roles -
  - ver logica de reserva y confirmación
  - agregar paginacion a los get y optimizar respuestas - 
  - reorganizar archivos y borrar los inutilizados  - 
