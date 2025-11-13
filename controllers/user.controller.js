@@ -9,43 +9,47 @@ const sanitize = (doc) => {
     return obj;
 };
 
-const ALLOWED_ROLES = new Set(["usuario", "admin", "conductor", "auxiliar"]);
-const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
+const ALLOWED_ROLES = new Set(["superAdmin", "usuario", "admin", "conductor", "auxiliar", "visita"]);
+const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 const isBcryptHash = (s = "") => typeof s === "string" && /^\$2[aby]\$/.test(s);
 
-// crear usuario
 exports.createUser = async (req, res) => {
     try {
-        let { name, rut, email, password, role, activo = true } = req.body || {};
+        let { name, rut, email, password, role = "usuario", activo = true } = req.body || {};
 
         email = typeof email === "string" ? email.trim().toLowerCase() : email;
         rut = typeof rut === "string" ? rut.trim() : rut;
 
         if (!name || !email || !password || !role || !rut) {
-            return res.status(400).json({ message: "Faltan campos requeridos (name, rut, email, password, role)." });
+            return res.status(400).json({ success: false, message: "Faltan campos requeridos (name, rut, email, password, role)." });
         }
-        if (!isValidEmail(email)) return res.status(400).json({ message: "Email inválido." });
-        if (isBcryptHash(password)) return res.status(400).json({ message: "Contraseña hasheada." });
-        if (!ALLOWED_ROLES.has(role)) return res.status(400).json({ message: "Rol inválido." });
-        if (password.length < 8) return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres." });
+        if (!isValidEmail(email)) return res.status(400).json({ success: false, message: "Email inválido." });
+        if (isBcryptHash(password)) return res.status(400).json({ success: false, message: "Contraseña no debe venir hasheada." });
+        if (!ALLOWED_ROLES.has(role)) return res.status(400).json({ success: false, message: "Rol inválido." });
+        if (String(password).length < 8) return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 8 caracteres." });
 
         const user = new User({ name, rut, email, password, role, activo });
         await user.save();
 
-        return res.status(201).json(sanitize(user));
+        return res.status(201).json({
+            success: true,
+            message: "Usuario creado exitosamente.",
+            id: user._id
+        });
     } catch (err) {
+        console.error("createUser error:", err);
+
         if (err?.code === 11000) {
-            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || "campo único";
-            return res.status(409).json({ message: `Ya existe un usuario con ese ${field}.` });
+            const field = Object.keys(err.keyValue || err.keyPattern || {})[0] || "campo único";
+            return res.status(409).json({ success: false, message: `Ya existe un usuario con ese ${field}.` });
         }
         if (err?.name === "ValidationError") {
-            return res.status(422).json({ message: "Error de validación.", details: err.errors });
+            return res.status(422).json({ success: false, message: "Error de validación.", details: err.errors });
         }
-        return res.status(500).json({ message: "Error al crear usuario.", error: err.message });
+        return res.status(500).json({ success: false, message: "Error al crear usuario.", error: err.message });
     }
 };
 
-// --- Listar usuarios (con filtros y paginación) ---
 exports.getUsers = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page) || 1, 1);
@@ -63,11 +67,16 @@ exports.getUsers = async (req, res) => {
         if (activo !== undefined) filter.activo = activo;
 
         const [items, total] = await Promise.all([
-            User.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).select("-password"),
+            User.find(filter)
+                .sort({ createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select("-password"),
             User.countDocuments(filter),
         ]);
 
-        return res.json({
+        return res.status(200).json({
+            success: true,
             page,
             limit,
             total,
@@ -75,50 +84,50 @@ exports.getUsers = async (req, res) => {
             items,
         });
     } catch (err) {
-        return res.status(500).json({ message: "Error al listar usuarios.", error: err.message });
+        console.error("getUsers error:", err);
+        return res.status(500).json({ success: false, message: "Error al listar usuarios.", error: err.message });
     }
 };
 
-// --- Obtener un usuario por ID ---
 exports.getUserById = async (req, res) => {
     try {
         const id = req.params.id;
         const user = await User.findById(id).select("-password");
-        if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
-        return res.json(user);
+        if (!user) return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+        return res.status(200).json({ success: true, data: user });
     } catch (err) {
+        console.error("getUserById error:", err);
         if (err?.name === "CastError") {
-            return res.status(400).json({ message: "ID inválido." });
+            return res.status(400).json({ success: false, message: "ID inválido." });
         }
-        return res.status(500).json({ message: "Error al obtener usuario.", error: err.message });
+        return res.status(500).json({ success: false, message: "Error al obtener usuario.", error: err.message });
     }
 };
 
 exports.getCrewUsers = async (req, res) => {
     try {
-      const crewUsers = await User.find({
-        role: { $in: ["conductor", "auxiliar"] },
-        activo: true, // opcional: solo los activos
-      }).select("-password -createdAt -updatedAt -__v"); // excluye el password
-  
-      res.json({
-        count: crewUsers.length,
-        users: crewUsers,
-      });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  };
-  
+        const crewUsers = await User.find({
+            role: { $in: ["conductor", "auxiliar"] },
+            activo: true,
+        }).select("-password -createdAt -updatedAt -__v");
 
-// --- Actualizar (PUT) ---
-// NOTA: Usamos "findById" + "save()" para que se dispare el pre('save') (hash de password)
+        return res.status(200).json({
+            success: true,
+            count: crewUsers.length,
+            users: crewUsers,
+        });
+    } catch (err) {
+        console.error("getCrewUsers error:", err);
+        return res.status(500).json({ success: false, message: "Error al obtener tripulación.", error: err.message });
+    }
+};
+
 exports.updateUser = async (req, res) => {
     try {
         const id = req.params.id;
         const payload = req.body || {};
         const user = await User.findById(id);
-        if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
+        if (!user) return res.status(404).json({ success: false, message: "Usuario no encontrado." });
 
         const updatable = ["name", "rut", "email", "password", "role", "activo"];
         for (const key of updatable) {
@@ -126,28 +135,28 @@ exports.updateUser = async (req, res) => {
 
             if (key === "email") {
                 const newEmail = String(payload.email).trim().toLowerCase();
-                if (!isValidEmail(newEmail)) return res.status(400).json({ message: "Email inválido." });
+                if (!isValidEmail(newEmail)) return res.status(400).json({ success: false, message: "Email inválido." });
                 user.email = newEmail;
                 continue;
             }
 
             if (key === "password") {
                 if (!payload.password) continue;
-                if (isBcryptHash(payload.password)) return res.status(400).json({ message: "Contraseña Hasheada." });
-                if (payload.password.length < 8) return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres." });
-                user.password = payload.password; // el pre('save') la hashea
+                if (isBcryptHash(payload.password)) return res.status(400).json({ success: false, message: "Contraseña no debe venir hasheada." });
+                if (payload.password.length < 8) return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 8 caracteres." });
+                user.password = payload.password; // pre('save') lo hashea
                 continue;
             }
 
             if (key === "role") {
-                if (!ALLOWED_ROLES.has(payload.role)) return res.status(400).json({ message: "Rol inválido." });
+                if (!ALLOWED_ROLES.has(payload.role)) return res.status(400).json({ success: false, message: "Rol inválido." });
                 user.role = payload.role;
                 continue;
             }
 
             if (key === "rut") {
                 const newRut = String(payload.rut).trim();
-                if (!newRut) return res.status(400).json({ message: "RUT es requerido." });
+                if (!newRut) return res.status(400).json({ success: false, message: "RUT es requerido." });
                 user.rut = newRut;
                 continue;
             }
@@ -156,59 +165,73 @@ exports.updateUser = async (req, res) => {
         }
 
         await user.save();
-        return res.json(sanitize(user));
+
+        return res.status(200).json({
+            success: true,
+            message: "Usuario actualizado correctamente.",
+            id: user._id
+        });
     } catch (err) {
+        console.error("updateUser error:", err);
+
         if (err?.code === 11000) {
-            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || "campo único";
-            return res.status(409).json({ message: `Ya existe un usuario con ese ${field}.` });
+            const field = Object.keys(err.keyValue || err.keyPattern || {})[0] || "campo único";
+            return res.status(409).json({ success: false, message: `Ya existe un usuario con ese ${field}.` });
         }
         if (err?.name === "ValidationError") {
-            return res.status(422).json({ message: "Error de validación.", details: err.errors });
+            return res.status(422).json({ success: false, message: "Error de validación.", details: err.errors });
         }
         if (err?.name === "CastError") {
-            return res.status(400).json({ message: "ID inválido." });
+            return res.status(400).json({ success: false, message: "ID inválido." });
         }
-        return res.status(500).json({ message: "Error al actualizar usuario.", error: err.message });
+        return res.status(500).json({ success: false, message: "Error al actualizar usuario.", error: err.message });
     }
 };
 
-// --- Eliminar (DELETE) duro ---
 exports.deleteUser = async (req, res) => {
     try {
         const id = req.params.id;
         const target = await User.findById(id).select("-password");
-        if (!target) return res.status(404).json({ message: "Usuario no encontrado." });
+        if (!target) return res.status(404).json({ success: false, message: "Usuario no encontrado." });
 
         if (target.role === "superAdmin") {
             const remaining = await User.countDocuments({ role: "superAdmin", _id: { $ne: id } });
             if (remaining === 0) {
-                return res.status(400).json({ message: "No puedes eliminar al último superAdmin." });
+                return res.status(400).json({ success: false, message: "No puedes eliminar al último superAdmin." });
             }
         }
 
         await target.deleteOne();
-        return res.json({ message: "Usuario eliminado.", user: target });
+        return res.status(200).json({ success: true, message: "Usuario eliminado correctamente.", id: target._id });
     } catch (err) {
+        console.error("deleteUser error:", err);
         if (err?.name === "CastError") {
-            return res.status(400).json({ message: "ID inválido." });
+            return res.status(400).json({ success: false, message: "ID inválido." });
         }
-        return res.status(500).json({ message: "Error al eliminar usuario.", error: err.message });
+        return res.status(500).json({ success: false, message: "Error al eliminar usuario.", error: err.message });
     }
 };
 
-// --- (Opcional) Desactivar / activar sin borrar (soft toggle) ---
 exports.toggleActivo = async (req, res) => {
     try {
         const id = req.params.id;
         const user = await User.findById(id);
-        if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
+        if (!user) return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+
         user.activo = !user.activo;
         await user.save();
-        return res.json(sanitize(user));
+
+        return res.status(200).json({
+            success: true,
+            message: user.activo ? "Usuario activado." : "Usuario desactivado.",
+            id: user._id,
+            activo: user.activo
+        });
     } catch (err) {
+        console.error("toggleActivo error:", err);
         if (err?.name === "CastError") {
-            return res.status(400).json({ message: "ID inválido." });
+            return res.status(400).json({ success: false, message: "ID inválido." });
         }
-        return res.status(500).json({ message: "Error al actualizar estado.", error: err.message });
+        return res.status(500).json({ success: false, message: "Error al actualizar estado.", error: err.message });
     }
 };

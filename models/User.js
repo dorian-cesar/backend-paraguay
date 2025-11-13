@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     rut: { type: String, required: true, unique: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ["superAdmin", "usuario", "admin", "conductor", "auxiliar"], required: true },
+    role: { type: String, enum: ["superAdmin", "usuario", "admin", "conductor", "auxiliar", "visita"], required: true },
     activo: { type: Boolean, default: true },
 }, { timestamps: true });
 
