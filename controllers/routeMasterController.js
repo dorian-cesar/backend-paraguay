@@ -14,7 +14,7 @@ exports.createRouteMaster = async (req, res) => {
 // Listar todas las rutas maestras
 exports.getRouteMasters = async (req, res) => {
   try {
-    const routes = await RouteMaster.find().populate('layout');
+    const routes = await RouteMaster.find().populate('layout').populate('origin').populate('destination');
     res.json(routes);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -24,7 +24,11 @@ exports.getRouteMasters = async (req, res) => {
 // Obtener ruta maestra por ID
 exports.getRouteMasterById = async (req, res) => {
   try {
-    const route = await RouteMaster.findById(req.params.id).populate('layout');
+    const route = await RouteMaster.findById(req.params.id)
+      .populate('layout')
+      .populate('origin')
+      .populate('destination')
+      .populate('stops.city');
     if (!route) {
       return res.status(404).json({ message: 'Ruta maestra no encontrada' });
     }
@@ -38,7 +42,9 @@ exports.getRouteMasterById = async (req, res) => {
 exports.updateRouteMaster = async (req, res) => {
   try {
     const route = await RouteMaster.findByIdAndUpdate(req.params.id, req.body, { new: true })
-      .populate('layout');
+      .populate('layout')
+      .populate('origin')
+      .populate('destination');
     if (!route) {
       return res.status(404).json({ message: 'Ruta maestra no encontrada' });
     }
@@ -61,93 +67,86 @@ exports.deleteRouteMaster = async (req, res) => {
   }
 };
 
-exports.getOriginsByDirection = async (req, res) => {
+exports.getRouteOrigins = async (req, res) => {
   try {
-    const { direction } = req.query;
-
-    if (!direction || !['subida', 'bajada'].includes(direction)) {
-      return res.status(400).json({ message: 'Parámetro direction requerido y debe ser "subida" o "bajada".' });
-    }
-
-    const routes = await RouteMaster.find({ direction }).lean();
+    const routes = await RouteMaster.find().populate('origin').lean();
     if (!routes.length) {
-      return res.status(404).json({ message: 'No hay rutas para esa dirección' });
+      return res.status(404).json({ message: 'No hay rutas disponibles' });
     }
 
-    let originsSet = new Set();
-
-    if (direction === 'subida') {
-      // Recorre los stops de todas las rutas de subida
-      for (const r of routes) {
-        if (Array.isArray(r.stops)) {
-          r.stops.forEach(s => {
-            if (s && s.name) originsSet.add(s.name);
-          });
-        }
+    const originsSet = new Set();
+    routes.forEach(route => {
+      if (route.origin && route.origin.name) {
+        originsSet.add(route.origin.name);
       }
-    } else {
-      // Bajada → origen fijo de cada ruta (generalmente la minera)
-      routes.forEach(r => {
-        if (r.origin) originsSet.add(r.origin);
-      });
-    }
+    });
 
-    const origins = Array.from(originsSet).sort(); // opcional: orden alfabético
+    const origins = Array.from(originsSet).sort();
 
     return res.json({
-      direction,
       count: origins.length,
       origins
     });
-
   } catch (err) {
-    console.error('getOriginsByDirection error', err);
+    console.error('getRouteOrigins error', err);
     return res.status(500).json({ message: 'Error al obtener orígenes' });
   }
 };
 
-
-exports.getDestinationsByDirection = async (req, res) => {
+exports.getRouteDestinations = async (req, res) => {
   try {
-    const { direction } = req.query;
-
-    if (!direction || !['subida', 'bajada'].includes(direction)) {
-      return res.status(400).json({ message: 'Parámetro direction requerido y debe ser "subida" o "bajada".' });
-    }
-
-    const routes = await RouteMaster.find({ direction }).lean();
+    const routes = await RouteMaster.find().populate('destination').lean();
     if (!routes.length) {
-      return res.status(404).json({ message: 'No hay rutas para esa dirección' });
+      return res.status(404).json({ message: 'No hay rutas disponibles' });
     }
 
-    let destinationsSet = new Set();
-
-    if (direction === 'subida') {
-      // Subida → destino fijo de cada ruta (generalmente la minera)
-      routes.forEach(r => {
-        if (r.destination) destinationsSet.add(r.destination);
-      });
-    } else {
-      // Bajada → Recorre los stops de todas las rutas de bajada
-      for (const r of routes) {
-        if (Array.isArray(r.stops)) {
-          r.stops.forEach(s => {
-            if (s && s.name) destinationsSet.add(s.name);
-          });
-        }
+    const destinationsSet = new Set();
+    routes.forEach(route => {
+      if (route.destination && route.destination.name) {
+        destinationsSet.add(route.destination.name);
       }
-    }
+    });
 
-    const destinations = Array.from(destinationsSet).sort(); // opcional: orden alfabético
+    const destinations = Array.from(destinationsSet).sort();
 
     return res.json({
-      direction,
       count: destinations.length,
       destinations
     });
-
   } catch (err) {
-    console.error('getDestinationsByDirection error', err);
+    console.error('getRouteDestinations error', err);
     return res.status(500).json({ message: 'Error al obtener destinos' });
+  }
+};
+
+// Nuevo método para obtener todas las paradas de una ruta
+exports.getRouteStops = async (req, res) => {
+  try {
+    const route = await RouteMaster.findById(req.params.id)
+      .populate('stops.city')
+      .populate('origin')
+      .populate('destination');
+
+    if (!route) {
+      return res.status(404).json({ message: 'Ruta no encontrada' });
+    }
+
+    const allStops = [
+      { ...route.origin.toObject(), order: 0, isOrigin: true },
+      ...route.stops.map(stop => ({
+        ...stop.city.toObject(),
+        order: stop.order,
+        offsetMinutes: stop.offsetMinutes,
+        price: stop.price
+      })),
+      { ...route.destination.toObject(), order: route.stops.length + 1, isDestination: true }
+    ];
+
+    res.json({
+      route: route.name,
+      stops: allStops.sort((a, b) => a.order - b.order)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

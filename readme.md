@@ -9,9 +9,11 @@
 6. Asignar Tripulación.
 
 ---
-## pasos
-1. modificar ruta master y sus dependientes para no usar direction
-1.1 generar servicios manualmente
-2. generar servicios automaticamente
-3. manejar roles
-4. ver logica de reserva y confirmación
+## pendiente
+ -- modificar ruta master y sus dependientes para no usar direction
+ -- generar servicios manualmente
+ - generar servicios automaticamente
+ - manejar roles
+ - ver logica de reserva y confirmación
+ - agregar paginacion a los get
+ - reorganizar archivos y borrar los inutilizados 

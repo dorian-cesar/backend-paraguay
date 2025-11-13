@@ -20,7 +20,13 @@ exports.generateServices = async (req, res) => {
   try {
     const { routeMasterId } = req.body;
 
-    const route = await RouteMaster.findById(routeMasterId).populate('layout');
+    // HACER POPULATE DE origin, destination Y stops.city
+    const route = await RouteMaster.findById(routeMasterId)
+      .populate('layout')
+      .populate('origin')  // ← AGREGAR ESTO
+      .populate('destination')  // ← AGREGAR ESTO
+      .populate('stops.city');  // ← AGREGAR ESTO
+
     if (!route) return res.status(404).json({ error: 'Ruta maestra no encontrada' });
 
     // Verificar si el horario está activo
@@ -98,7 +104,7 @@ exports.getServicesByFilter = async (req, res) => {
     const start = dayjs.tz(date, TZ).startOf('day').toDate();
     const end = dayjs.tz(date, TZ).endOf('day').toDate();
 
-    // Traer servicios que tengan ambas paradas
+    // Traer servicios que tengan ambas paradas (SIN direction)
     const servicesRaw = await Service.find({
       date: { $gte: start, $lte: end },
       departures: {
@@ -108,29 +114,15 @@ exports.getServicesByFilter = async (req, res) => {
         ]
       }
     })
-      .select('-__v -createdAt -updatedAt')
-      .populate({
-        path: 'layout',
-        select: '-__v -createdAt -updatedAt -floor1 -floor2'
-      })
-      .populate({
-        path: 'bus',
-        select: '-__v -createdAt -updatedAt'
-      })
-      .populate({
-        path: 'crew.user',
-        select: '-password -__v -createdAt -updatedAt'
-      })
-    // .populate({
-    //   path: 'seats',
-    //   select: '-__v -createdAt -updatedAt'
-    // });
+      .populate('layout')
+      .populate('bus')
+      .populate('crew.user');
 
     // Filtrar por orden de paradas
     const servicesFiltered = servicesRaw.filter(service => {
       const depOrigin = service.departures.find(d => d.stop === origin);
       const depDest = service.departures.find(d => d.stop === destination);
-      return depOrigin.order < depDest.order;
+      return depOrigin && depDest && depOrigin.order < depDest.order;
     });
 
     return res.status(200).json({ services: servicesFiltered });

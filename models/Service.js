@@ -5,7 +5,6 @@ const departureSchema = new mongoose.Schema({
   stop: { type: String, required: true },
   time: { type: Date, required: true },
   price: { type: Number, required: true }
-
 }, { _id: false });
 
 const crewMemberSchema = new mongoose.Schema({
@@ -31,7 +30,6 @@ const farSchema = new mongoose.Schema({
 const serviceSchema = new mongoose.Schema({
   routeMaster: { type: mongoose.Schema.Types.ObjectId, ref: 'RouteMaster', required: true },
   date: { type: Date, required: true },
-  direction: { type: String, enum: ['subida', 'bajada'], required: true },
   origin: { type: String, required: true },
   destination: { type: String, required: true },
   bus: { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', default: null },
@@ -56,4 +54,3 @@ serviceSchema.pre('validate', function (next) {
 });
 
 module.exports = mongoose.model('Service', serviceSchema);
-
