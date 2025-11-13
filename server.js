@@ -11,7 +11,7 @@ const startGenerateServicesCron = require("./cron/generateServices");
 const app = express();
 
 // Rutas servicios
-const routeAuth = require("./routes/authRoutes");
+const routeAuth = require("./routes/auth.routes");
 const routeBusLayout = require("./routes/busLayoutRoutes");
 const routeMastersRoutes = require("./routes/routeMasters");
 const routeSeat = require("./routes/seatRoutes");
