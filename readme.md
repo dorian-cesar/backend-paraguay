@@ -15,5 +15,5 @@
  - generar servicios automaticamente
  - manejar roles
  - ver logica de reserva y confirmación
- - agregar paginacion a los get
+ - agregar paginacion a los get y optimizar respuestas
  - reorganizar archivos y borrar los inutilizados 
