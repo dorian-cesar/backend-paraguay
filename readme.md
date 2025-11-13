@@ -10,8 +10,8 @@
 
 ---
 ## pendiente
- -- modificar ruta master y sus dependientes para no usar direction
- -- generar servicios manualmente
+ - -- modificar ruta master y sus dependientes para no usar direction
+ - -- generar servicios manualmente
  - generar servicios automaticamente
  - manejar roles
  - ver logica de reserva y confirmación
