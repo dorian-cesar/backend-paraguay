@@ -12,13 +12,13 @@ const app = express();
 
 // Rutas servicios
 const routeAuth = require("./routes/auth.routes");
-const routeBusLayout = require("./routes/busLayoutRoutes");
+const routeBusLayout = require("./routes/busLayout.routes");
 const routeMastersRoutes = require("./routes/routeMasters");
 const routeSeat = require("./routes/seatRoutes");
 const routeService = require("./routes/serviceRoutes");
 const routeUsers = require("./routes/userRoutes");
 const routeBus = require("./routes/bus.routes");
-const routeCity = require("./routes/cityRoutes");
+const routeCity = require("./routes/city.routes");
 
 // Middlewares
 app.use(cors());
